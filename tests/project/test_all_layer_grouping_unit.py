@@ -76,11 +76,11 @@ class AllLayerGroupingTests(unittest.TestCase):
     def foreign(self, group: 'list[str]', layer: 'str') -> 'set[str]':
         """Names in ``group`` whose class reports a layer other than ``layer``.
 
-        A class whose ``__layer__`` is unset (``FTP_DATA`` subclasses ``Raw``) is not
-        foreign.
+        An unset ``__layer__`` is foreign too: ``FTP_DATA`` reported :obj:`None`
+        from the application group until it gained its ``Application`` base (#2285).
         """
         return {name for name in group
-                if (getattr(self.exported.get(name), '__layer__', None) or layer) != layer}
+                if getattr(self.exported.get(name), '__layer__', None) != layer}
 
     def test_groups_are_found(self) -> None:
         self.assertIn('ARP', self.link)

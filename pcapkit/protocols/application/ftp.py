@@ -319,8 +319,25 @@ class FTP(Application[Data_FTP, Schema_FTP],
         return args.decode('latin-1'), 'latin-1'
 
 
-class FTP_DATA(Raw):
-    """This class implements FTP data channel transmission."""
+class FTP_DATA(Application, Raw):  # pylint: disable=abstract-method
+    """This class implements FTP data channel transmission.
+
+    The layer base :class:`~pcapkit.protocols.application.application.Application`
+    comes first, for ``layer == 'Application'``, then the parsing base
+    :class:`~pcapkit.protocols.misc.raw.Raw`, which keeps the channel's octets
+    undissected. See :doc:`/contributing/conventions/protocol-layer-placement`.
+
+    .. versionchanged:: 1.5.0
+
+       Derives from :class:`~pcapkit.protocols.application.application.Application`
+       as well as :class:`~pcapkit.protocols.misc.raw.Raw`, so its layer is
+       ``'Application'``, where it was :obj:`None`, and its ``__index__`` is
+       :meth:`Application.__index__
+       <pcapkit.protocols.application.application.Application.__index__>`,
+       raising :exc:`~pcapkit.utilities.exceptions.IntError` where it raised
+       :exc:`~pcapkit.utilities.exceptions.UnsupportedCall` (:issue:`2285`).
+
+    """
 
     ##########################################################################
     # Properties.

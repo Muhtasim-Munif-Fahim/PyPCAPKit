@@ -422,6 +422,25 @@ _CODE_DESTINATIONS: 'dict[type, tuple[Type[ProtocolBase], ...]]' = {
     Enum_LinkType: (Frame, PCAPNG),
 }
 
+#: Key type of each ``__proto__`` dispatch registry a ``code=`` target can name.
+#:
+#: Maps the class owning the registry to the enum its typed registrar checks
+#: ``code`` against, and whether a bare :class:`int` is a valid key there too --
+#: the same :func:`_check_code` arguments that registrar passes. A destination is
+#: looked up by the class it inherits ``__proto__`` from, so a subclass sharing
+#: :class:`Link`'s registry is checked as :class:`Link` is, while one keeping a
+#: registry of its own, such as :class:`~pcapkit.protocols.link.loopback.Loopback`,
+#: names no entry here and is not checked (:issue:`2268`).
+_DESTINATION_KINDS: 'dict[type, tuple[type, bool]]' = {
+    Link: (Enum_EtherType, False),
+    Internet: (Enum_TransType, False),
+    Frame: (Enum_LinkType, False),
+    PCAPNG: (Enum_LinkType, False),
+    TCP: (Enum_AppType, True),
+    UDP: (Enum_AppType, True),
+    SCTP: (Enum_PayloadProtocolIdentifier, True),
+}
+
 
 def _iter_code_targets(code: 'Any') -> 'Iterator[tuple[Type[ProtocolBase], Any]]':
     """Flatten a ``code=`` argument into ``(destination, key)`` pairs.
@@ -527,10 +546,22 @@ def register_protocol_code(protocol: 'Type[ProtocolBase]', code: 'Any') -> 'None
         RegistryError: If a bare :class:`int` (or any other non-enum,
             non-mapping value) is given without an explicit destination, or if
             an enum member's type names no known destination registry --
-            inference refuses rather than guesses.
+            inference refuses rather than guesses; or if a key is not of the
+            type its destination's registry is keyed by, as its typed registrar
+            would reject it, e.g. ``{Frame: TransType.ICMP}``. Every target is
+            checked before any is registered, so a rejected ``code`` leaves
+            every registry as it was (:issue:`2268`).
 
     """
-    for destination, key in _iter_code_targets(code):
+    targets = list(_iter_code_targets(code))
+    for destination, key in targets:
+        owner = next((klass for klass in getattr(destination, '__mro__', ())
+                      if '__proto__' in vars(klass)), None)
+        if owner in _DESTINATION_KINDS:
+            kind, number = _DESTINATION_KINDS[owner]
+            _check_code(key, kind, number=number)
+
+    for destination, key in targets:
         destination.register(key, protocol)
         logger.debug('registered %s into %s.__proto__: %s', protocol.__name__,
                      destination.__name__, key)
